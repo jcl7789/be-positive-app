@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/app/api/cron/phrase-gen",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
