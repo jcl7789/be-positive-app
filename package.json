@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node scripts/run-tests.js",
+    "test:retry": "tsx __tests__/lib/retry.test.ts",
+    "test:cache": "tsx __tests__/lib/cache.test.ts",
+    "test:logger": "tsx __tests__/lib/logger.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.1",
@@ -26,6 +30,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint-config-next": "16.0.3",
     "tailwindcss": "^4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.9"
   }
 }

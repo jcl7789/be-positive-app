@@ -14,7 +14,7 @@ export const PhraseDisplay: React.FC = () => {
   const [attemptCount, setAttemptCount] = useState<number>(0);
 
   // Usamos useCallback para que la función sea memorizada (aunque el React Compiler lo haría, es buena práctica)
-  const fetchNewPhrase = useCallback(async (retryCount = 0) => {
+  const fetchNewPhrase = useCallback(async (retryCount = 0, usePost = false) => {
     // No hacer más de 3 intentos
     if (retryCount > 3) {
       setError('Error al obtener la frase después de varios intentos. Por favor, recarga la página.');
@@ -27,7 +27,10 @@ export const PhraseDisplay: React.FC = () => {
     setAttemptCount(retryCount + 1);
 
     try {
+      // Usar POST si es solicitud manual de nueva frase, GET para inicial
+      const method = usePost ? 'POST' : 'GET';
       const response = await fetch(API_URL, {
+        method,
         // Agregar timeout de 10 segundos
         signal: AbortSignal.timeout(10000),
       });
@@ -48,7 +51,7 @@ export const PhraseDisplay: React.FC = () => {
           // Si es error de servidor (500), reintentar con backoff
           if (response.status === 500 && retryCount < 3) {
             const delay = Math.pow(2, retryCount) * 1000; // Backoff exponencial: 1s, 2s, 4s
-            setTimeout(() => fetchNewPhrase(retryCount + 1), delay);
+            setTimeout(() => fetchNewPhrase(retryCount + 1, usePost), delay);
             return;
           }
           setError(errorMessage);
@@ -69,7 +72,7 @@ export const PhraseDisplay: React.FC = () => {
       // Reintentar en caso de errores de red
       if (retryCount < 3) {
         const delay = Math.pow(2, retryCount) * 1000;
-        setTimeout(() => fetchNewPhrase(retryCount + 1), delay);
+        setTimeout(() => fetchNewPhrase(retryCount + 1, usePost), delay);
         return;
       }
 
@@ -125,7 +128,7 @@ export const PhraseDisplay: React.FC = () => {
               
               <div className="flex gap-3 justify-center">
                 <button
-                  onClick={() => fetchNewPhrase()}
+                  onClick={() => fetchNewPhrase(0, true)}
                   disabled={loading}
                   className="px-6 py-2 bg-teal-700 text-white rounded-lg hover:bg-teal-800 disabled:opacity-50 transition-colors font-medium"
                 >
