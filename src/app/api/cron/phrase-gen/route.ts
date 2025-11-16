@@ -47,13 +47,7 @@ export async function GET(request: NextRequest) {
                 console.error(`Error generando/guardando frase (intento ${attemptCount + 1}):`, err);
                 phraseData = null;
             }
-
-            if (!phraseData) {
-                // Esperar un poco antes de reintentar
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-
-            attemptCount++;
+                attemptCount++;
         } while (!phraseData && attemptCount < maxRetries);
 
         // Si tras los reintentos no hay frase válida, devolvemos error indicando cuántas se insertaron
