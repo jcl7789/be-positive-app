@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
         // Seleccionamos la frase con la 'fecha_ultimo_uso' más antigua (NULL primero)
         // Esto garantiza que las frases nuevas o no usadas se prioricen.
         
+        console.info("Fetching phrase from database with rotation logic.");
         const selectionResult = await db.query(
             `
             SELECT id, texto, categoria
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
             `
         );
         
+        console.info("Phrase selection result:", selectionResult.rows);
         // 2. VERIFICACIÓN DE RESULTADO
         if (selectionResult.rows.length === 0) {
              // Devolver un error específico si la BD está vacía (antes de que el Cron Job haya generado frases)
@@ -33,6 +35,8 @@ export async function GET(request: NextRequest) {
         const selectedFrase = selectionResult.rows[0];
         const { id, texto, categoria } = selectedFrase;
 
+        console.log(`Selected phrase ID: ${id}, Text: ${texto}, Category: ${categoria}`);
+        console.log("Updating phrase usage timestamp for rotation.");
         // 3. ACTUALIZACIÓN DEL REGISTRO DE USO (ROTACIÓN)
         // Actualizar el timestamp de 'fecha_ultimo_uso' para esta frase.
         // Esto la mueve al final de la cola de selección, garantizando la rotación.
