@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/db'; // Módulo de conexión a Supabase
 import { PhraseResponse } from '@/lib/types';
+import { getCachedPhrase, setCachedPhrase } from '@/lib/cache';
 
 /**
  * Handles GET requests to retrieve and rotate a single positive phrase.
@@ -8,7 +9,18 @@ import { PhraseResponse } from '@/lib/types';
  */
 export async function GET(request: NextRequest) {
     try {
-        // 1. SELECCIÓN DE LA FRASE CON ROTACIÓN
+        // 1. VERIFICAR CACHÉ
+        // Primero intenta obtener la frase del caché en memoria
+        const cachedPhrase = getCachedPhrase();
+        if (cachedPhrase) {
+            return NextResponse.json({
+                success: true,
+                phrase: cachedPhrase,
+                cached: true
+            }, { status: 200 });
+        }
+
+        // 2. SELECCIÓN DE LA FRASE CON ROTACIÓN
         // Seleccionamos la frase con la 'fecha_ultimo_uso' más antigua (NULL primero)
         // Esto garantiza que las frases nuevas o no usadas se prioricen.
         
@@ -24,7 +36,7 @@ export async function GET(request: NextRequest) {
         }
         
         console.info("Phrase selection result:", frases);
-        // 2. VERIFICACIÓN DE RESULTADO
+        // 3. VERIFICACIÓN DE RESULTADO
         if (!frases || frases.length === 0) {
              // Devolver un error específico si la BD está vacía (antes de que el Cron Job haya generado frases)
              return NextResponse.json({ 
@@ -38,7 +50,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`Selected phrase ID: ${id}, Text: ${texto}, Category: ${categoria}`);
         console.log("Updating phrase usage timestamp for rotation.");
-        // 3. ACTUALIZACIÓN DEL REGISTRO DE USO (ROTACIÓN)
+        // 4. ACTUALIZACIÓN DEL REGISTRO DE USO (ROTACIÓN)
         // Actualizar el timestamp de 'fecha_ultimo_uso' para esta frase.
         // Esto la mueve al final de la cola de selección, garantizando la rotación.
         const { error: updateError } = await supabase
@@ -54,10 +66,16 @@ export async function GET(request: NextRequest) {
             message: texto,
             category: categoria,
         }
-        // 4. RESPUESTA EXITOSA
+
+        // 5. GUARDAR EN CACHÉ
+        // Cachear la frase por 24 horas
+        setCachedPhrase(response);
+
+        // 6. RESPUESTA EXITOSA
         return NextResponse.json({
             success: true,
-            phrase: response
+            phrase: response,
+            cached: false
         }, { status: 200 });
 
     } catch (error) {
