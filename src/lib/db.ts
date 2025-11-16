@@ -1,7 +1,7 @@
 import { Pool, PoolConfig } from 'pg';
 
 const myPoolConfig = (): PoolConfig => {
-  if (process.env.SCOPE === 'prod') {
+  if (process.env.SCOPE === 'prod' || process.env.VERCEL_ENV === 'production') {
     return {
       ssl: true,
       database: process.env.POSTGRES_DATABASE,
