@@ -6,7 +6,7 @@ const getSSLConfig = () => {
     if (isProduction) {
         return { rejectUnauthorized: false };
     } 
-    return false;
+    return true;
 }
 
 // Este objeto Pool será la conexión a Vercel Postgres o tu BD de desarrollo.
