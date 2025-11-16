@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai'; // Asume la instalación del SDK de Gemini
 import { db } from '@/lib/db'; // Asume un módulo de conexión a Vercel Postgres
+import { PhraseResponse } from '@/lib/types';
 
 // El prompt maestro definido
 const POETA_PROMPT = `Eres un poeta cuyo único objetivo es elevar el espíritu del lector. Debes generar una sola frase que sea profundamente positiva y excepcionalmente concisa, enfocada en un único sentimiento inspirador.
@@ -34,42 +35,33 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const targetCount = 10; // Número de frases a insertar en total
-        let inserted = 0;
+        let phraseData: { category: string; message: string } | null = null;
+        let attemptCount = 0;
 
-        while (inserted < targetCount) {
-            let phraseData: { category: string; message: string } | null = null;
-            let attemptCount = 0;
-
-            // Intentos por cada frase individual
-            do {
-                try {
-                    phraseData = await generateAndStorePhrase(ai, db, POETA_PROMPT);
-                } catch (err) {
-                    // Si la función lanza, lo tratamos como fallo y reintentamos
-                    console.error(`Error generando/guardando frase (intento ${attemptCount + 1}):`, err);
-                    phraseData = null;
-                }
-
-                if (!phraseData) {
-                    // Esperar un poco antes de reintentar
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                }
-
-                attemptCount++;
-            } while (!phraseData && attemptCount < maxRetries);
-
-            // Si tras los reintentos no hay frase válida, devolvemos error indicando cuántas se insertaron
-            if (!phraseData) {
-                return NextResponse.json({ success: false, message: `Falló al generar la frase ${inserted + 1} tras ${maxRetries} intentos. Se insertaron ${inserted} frases.` }, { status: 500 });
+        // Intentos por cada frase individual
+        do {
+            try {
+                phraseData = await generateAndStorePhrase(ai, db, POETA_PROMPT);
+            } catch (err) {
+                // Si la función lanza, lo tratamos como fallo y reintentamos
+                console.error(`Error generando/guardando frase (intento ${attemptCount + 1}):`, err);
+                phraseData = null;
             }
 
-            inserted++;
-            // Pequeña pausa para evitar posibles límites de la API
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            if (!phraseData) {
+                // Esperar un poco antes de reintentar
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+
+            attemptCount++;
+        } while (!phraseData && attemptCount < maxRetries);
+
+        // Si tras los reintentos no hay frase válida, devolvemos error indicando cuántas se insertaron
+        if (!phraseData) {
+            return NextResponse.json({ success: false, message: `Falló al generar la frase` }, { status: 500 });
         }
 
-        return NextResponse.json({ success: true, message: `Se insertaron ${targetCount} frases correctamente.` }, { status: 200 });
+        return NextResponse.json({ success: true, message: `Se insertó una frase correctamente.` }, { status: 200 });
 
     } catch (error) {
         console.error('Error en el Cron Job de IA:', error);
@@ -95,7 +87,7 @@ const generateAndStorePhrase = async (ai: any, db: any, prompt: string): Promise
 
     // 3. **PARSEAR Y VALIDAR**
     const jsonText = response.text.trim();
-    let phraseData: { category: string; message: string };
+    let phraseData: PhraseResponse;
     try {
         phraseData = JSON.parse(jsonText);
     } catch (err) {
