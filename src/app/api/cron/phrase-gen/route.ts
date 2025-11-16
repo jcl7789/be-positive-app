@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai'; // Asume la instalación del SDK de Gemini
-import { db } from '@/lib/db'; // Asume un módulo de conexión a Vercel Postgres
+import { supabase } from '@/lib/db'; // Módulo de conexión a Supabase
 import { PhraseResponse } from '@/lib/types';
 
 // El prompt maestro definido
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         // Intentos por cada frase individual
         do {
             try {
-                phraseData = await generateAndStorePhrase(ai, db, POETA_PROMPT);
+                phraseData = await generateAndStorePhrase(ai, supabase, POETA_PROMPT);
             } catch (err) {
                 // Si la función lanza, lo tratamos como fallo y reintentamos
                 console.error(`Error generando/guardando frase (intento ${attemptCount + 1}):`, err);
@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// Función extraída: genera la frase con Gemini, parsea, valida e inserta en Postgres
-const generateAndStorePhrase = async (ai: any, db: any, prompt: string): Promise<{ category: string; message: string } | null> => {
+// Función extraída: genera la frase con Gemini, parsea, valida e inserta en Supabase
+const generateAndStorePhrase = async (ai: any, supabaseClient: any, prompt: string): Promise<{ category: string; message: string } | null> => {
     // 2. **GENERACIÓN DE LA FRASE**
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -98,12 +98,21 @@ const generateAndStorePhrase = async (ai: any, db: any, prompt: string): Promise
         throw new Error('Respuesta de IA incompleta.');
     }
 
-    // 4. **INSERCIÓN EN POSTGRES** (Asume la librería Vercel Postgres y `db` connection)
-    await db.query(
-        `INSERT INTO frases (id, texto, categoria, fecha_creacion, fecha_ultimo_uso)
-             VALUES (uuid_generate_v4(), $1, $2, NOW(), NULL)`,
-        [phraseData.message, phraseData.category]
-    );
+    // 4. **INSERCIÓN EN SUPABASE**
+    const { error: insertError } = await supabaseClient
+        .from('frases')
+        .insert([
+            {
+                texto: phraseData.message,
+                categoria: phraseData.category,
+                fecha_creacion: new Date().toISOString(),
+                fecha_ultimo_uso: null
+            }
+        ]);
+    
+    if (insertError) {
+        throw new Error(`Error inserting phrase: ${insertError.message}`);
+    }
 
     return phraseData;
 }

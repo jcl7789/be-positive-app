@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db'; // Módulo de conexión a Vercel Postgres
+import { supabase } from '@/lib/db'; // Módulo de conexión a Supabase
 import { PhraseResponse } from '@/lib/types';
 
 /**
@@ -13,18 +13,19 @@ export async function GET(request: NextRequest) {
         // Esto garantiza que las frases nuevas o no usadas se prioricen.
         
         console.info("Fetching phrase from database with rotation logic.");
-        const selectionResult = await db.query(
-            `
-            SELECT id, texto, categoria
-            FROM frases
-            ORDER BY fecha_ultimo_uso ASC NULLS FIRST
-            LIMIT 1
-            `
-        );
+        const { data: frases, error: selectError } = await supabase
+            .from('frases')
+            .select('id, texto, categoria')
+            .order('fecha_ultimo_uso', { ascending: true, nullsFirst: true })
+            .limit(1);
         
-        console.info("Phrase selection result:", selectionResult.rows);
+        if (selectError) {
+            throw new Error(selectError.message);
+        }
+        
+        console.info("Phrase selection result:", frases);
         // 2. VERIFICACIÓN DE RESULTADO
-        if (selectionResult.rows.length === 0) {
+        if (!frases || frases.length === 0) {
              // Devolver un error específico si la BD está vacía (antes de que el Cron Job haya generado frases)
              return NextResponse.json({ 
                 success: false, 
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
             }, { status: 404 });
         }
 
-        const selectedFrase = selectionResult.rows[0];
+        const selectedFrase = frases[0];
         const { id, texto, categoria } = selectedFrase;
 
         console.log(`Selected phrase ID: ${id}, Text: ${texto}, Category: ${categoria}`);
@@ -40,14 +41,14 @@ export async function GET(request: NextRequest) {
         // 3. ACTUALIZACIÓN DEL REGISTRO DE USO (ROTACIÓN)
         // Actualizar el timestamp de 'fecha_ultimo_uso' para esta frase.
         // Esto la mueve al final de la cola de selección, garantizando la rotación.
-        await db.query(
-            `
-            UPDATE frases
-            SET fecha_ultimo_uso = NOW()
-            WHERE id = $1
-            `,
-            [id]
-        );
+        const { error: updateError } = await supabase
+            .from('frases')
+            .update({ fecha_ultimo_uso: new Date().toISOString() })
+            .eq('id', id);
+        
+        if (updateError) {
+            throw new Error(updateError.message);
+        }
 
         const response: PhraseResponse = {
             message: texto,
