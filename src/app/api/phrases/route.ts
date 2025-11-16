@@ -1,18 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/db'; // Módulo de conexión a Supabase
 import { PhraseResponse } from '@/lib/types';
 import { getCachedPhrase, setCachedPhrase } from '@/lib/cache';
+import { logInfo, logError, logWarn } from '@/lib/logger';
 
 /**
  * Handles GET requests to retrieve and rotate a single positive phrase.
  * This is the BFF endpoint consumed by the FraseDisplay component.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+
     try {
+        logInfo('Solicitando frase', { requestId });
+
         // 1. VERIFICAR CACHÉ
-        // Primero intenta obtener la frase del caché en memoria
         const cachedPhrase = getCachedPhrase();
         if (cachedPhrase) {
+            const duration = Date.now() - startTime;
+            logInfo('Frase obtenida del caché', {
+                requestId,
+                durationMs: duration,
+                cached: true,
+            });
             return NextResponse.json({
                 success: true,
                 phrase: cachedPhrase,
@@ -21,10 +32,8 @@ export async function GET(request: NextRequest) {
         }
 
         // 2. SELECCIÓN DE LA FRASE CON ROTACIÓN
-        // Seleccionamos la frase con la 'fecha_ultimo_uso' más antigua (NULL primero)
-        // Esto garantiza que las frases nuevas o no usadas se prioricen.
+        logInfo('Buscando frase en base de datos', { requestId });
         
-        console.info("Fetching phrase from database with rotation logic.");
         const { data: frases, error: selectError } = await supabase
             .from('frases')
             .select('id, texto, categoria')
@@ -32,46 +41,67 @@ export async function GET(request: NextRequest) {
             .limit(1);
         
         if (selectError) {
-            throw new Error(selectError.message);
+            logError('Error al seleccionar frase de BD', {
+                requestId,
+                error: selectError.message,
+                code: selectError.code,
+            });
+            return NextResponse.json({
+                success: false,
+                message: 'Oops! Hubo un error al obtener la frase.'
+            }, { status: 500 });
         }
-        
-        console.info("Phrase selection result:", frases);
+
         // 3. VERIFICACIÓN DE RESULTADO
         if (!frases || frases.length === 0) {
-             // Devolver un error específico si la BD está vacía (antes de que el Cron Job haya generado frases)
-             return NextResponse.json({ 
-                success: false, 
-                message: 'No hay frases disponibles... Por favor, intenta más tarde.' 
+            logWarn('No hay frases disponibles en BD', { requestId });
+            return NextResponse.json({
+                success: false,
+                message: 'No hay frases disponibles... Por favor, intenta más tarde.'
             }, { status: 404 });
         }
 
         const selectedFrase = frases[0];
         const { id, texto, categoria } = selectedFrase;
 
-        console.log(`Selected phrase ID: ${id}, Text: ${texto}, Category: ${categoria}`);
-        console.log("Updating phrase usage timestamp for rotation.");
+        logInfo('Frase seleccionada de BD', {
+            requestId,
+            phraseId: id,
+            category: categoria,
+        });
+
         // 4. ACTUALIZACIÓN DEL REGISTRO DE USO (ROTACIÓN)
-        // Actualizar el timestamp de 'fecha_ultimo_uso' para esta frase.
-        // Esto la mueve al final de la cola de selección, garantizando la rotación.
+        const now = new Date().toISOString();
         const { error: updateError } = await supabase
             .from('frases')
-            .update({ fecha_ultimo_uso: new Date().toISOString() })
+            .update({ fecha_ultimo_uso: now })
             .eq('id', id);
         
         if (updateError) {
-            throw new Error(updateError.message);
+            logError('Error actualizando timestamp de uso', {
+                requestId,
+                phraseId: id,
+                error: updateError.message,
+            });
+            // No fallar por esto, ya que la frase fue seleccionada
         }
 
         const response: PhraseResponse = {
             message: texto,
             category: categoria,
-        }
+        };
 
         // 5. GUARDAR EN CACHÉ
-        // Cachear la frase por 24 horas
         setCachedPhrase(response);
 
         // 6. RESPUESTA EXITOSA
+        const duration = Date.now() - startTime;
+        logInfo('Frase retornada exitosamente', {
+            requestId,
+            durationMs: duration,
+            cached: false,
+        });
+
         return NextResponse.json({
             success: true,
             phrase: response,
@@ -79,12 +109,19 @@ export async function GET(request: NextRequest) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error('Error fetching phrase:', error);
+        const duration = Date.now() - startTime;
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         
-        // Devolver un error 500 para fallos del servidor/BD
-        return NextResponse.json({ 
-            success: false, 
-            message: 'Oops! Hubo un error al obtener la frase.' 
+        logError('Error no esperado al obtener frase', {
+            requestId,
+            durationMs: duration,
+            error: errorMsg,
+            stack: error instanceof Error ? error.stack : undefined,
+        });
+        
+        return NextResponse.json({
+            success: false,
+            message: 'Oops! Hubo un error al obtener la frase.'
         }, { status: 500 });
     }
 }
