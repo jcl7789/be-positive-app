@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": "./src",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -19,7 +20,17 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      // Alias predeterminado de Next.js. Mapea @/ a la raíz de la baseUrl.
+      "@/*": ["*"], 
+      
+      // Alias específico para el módulo de base de datos
+      "@/lib/*": ["lib/*"], 
+      
+      // Alias para la carpeta de componentes del Frontend
+      "@/components/*": ["components/*"], 
+      
+      // Alias para el código del Backend (API Routes)
+      "@/api/*": ["app/api/*"]
     }
   },
   "include": [

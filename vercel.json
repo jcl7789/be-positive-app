@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/app/api/cron/phrase-gen",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Be Positive — Daily Positive Phrases
 
-## Getting Started
+Be Positive is a small Next.js app that serves a daily dose of short, positive phrases. It demonstrates a simple full-stack flow using the Next.js App Router, a lightweight client component for fetching phrases, and a Postgres backing store (designed for Vercel Postgres).
 
-First, run the development server:
+## What this project does
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Serves a single-page UI that displays one positive phrase at a time.
+- Provides an API endpoint that returns one phrase and rotates it by updating its last-used timestamp so phrases are reused in a round-robin fashion.
+- Exposes a cron-style API route to seed or generate phrases (intended to be called by a scheduled job on the platform).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js (App Router)
+- React (client components)
+- PostgreSQL (Vercel Postgres recommended)
+- TypeScript
+- Tailwind CSS (styles included via `globals.css`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Important files
 
-## Learn More
+- `src/components/PhraseDisplay.tsx` — Client component that fetches and displays phrases.
+- `src/app/api/phrases/route.ts` — BFF endpoint that selects one phrase and updates its `fecha_ultimo_uso` to rotate phrases.
+- `src/app/api/cron/phrase-gen/route.ts` — Route used to generate/seed phrases (for scheduled invocation).
+- `src/lib/db.ts` — Database connection helper (Postgres client).
+- `src/lib/types.ts` — Shared API types.
 
-To learn more about Next.js, take a look at the following resources:
+## Local development
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Install dependencies:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   npm install
 
-## Deploy on Vercel
+2. Add environment variables (example):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   - `DATABASE_URL` — Postgres connection string (Vercel Postgres connection recommended).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Run the dev server:
+
+   npm run dev
+
+Open http://localhost:3000 to view the app.
+
+## Deployment
+
+This project is ready to deploy to Vercel. If using Vercel Postgres, add the `DATABASE_URL` secret and configure a scheduled invocation (cron) to call the phrase generation route periodically if you want automatic seeding.
+
+## Contributing
+
+Contributions and improvements are welcome. Please open issues or pull requests.
+
+---
+
+Created with Next.js. See the source files in `src/` for implementation details.
