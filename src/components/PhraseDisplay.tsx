@@ -60,15 +60,6 @@ export const PhraseDisplay: React.FC = () => {
           </>
         )}
       </div>
-
-      <button
-        onClick={fetchNewPhrase}
-        disabled={loading}
-        className={`mt-14 px-8 py-4 rounded-full text-white text-lg font-bold transition duration-300 shadow-xl ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 active:scale-95'
-          }`}
-      >
-        {loading ? 'Esperando...' : '¡Quiero otra frase!'}
-      </button>
     </div>
   );
 };
